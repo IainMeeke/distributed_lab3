@@ -7,6 +7,7 @@ import os
 
 HOST = '' #host becomes any address the machine happens to have
 PORT = int(sys.argv[1]) #get the port from the command line arguments and convert to int
+IP = "iainmeeke.xyz"
 STUDENT_ID = '39e95f0efebef82542626bd6c3c28765726768817d45d38b2d911b26eb5d0b37'
 POOL_SIZE = 20
 
@@ -73,8 +74,13 @@ class ChatServer:
             if data == "KILL_SERVICE\n":
                 os._exit(0)
 
+            elif data.startswith("HELO") and data.endswith("\n"):
+                reply = '{}IP:{}\nPort:{}\nStudentID:{}\n'.format(IP,data,PORT,STUDENT_ID)
+
             elif data.startswith("JOIN_CHATROOM") and data.endswith("\n"):
                 reply = self.joinRoom(data,conn)
+
+
 
             else:
                 reply = ''#any other message
@@ -99,7 +105,7 @@ class ChatServer:
         self.users_in_rooms[room_id][client_id] = conn
 
 
-        return "JOINED_CHATROOM: " + str(room_name) + "\n" +"SERVER_IP: iainmeeke.xyz\nPORT: "+str(PORT)+"\nROOM_REF: "+str(room_id)+"\nJOIN_ID: "+str(client_id)+"\n"
+        return "JOINED_CHATROOM: " + str(room_name) + "\n" +"SERVER_IP: "+IP+"\nPORT: "+str(PORT)+"\nROOM_REF: "+str(room_id)+"\nJOIN_ID: "+str(client_id+"\n"
 
 
 
