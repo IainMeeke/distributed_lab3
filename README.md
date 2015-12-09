@@ -1,5 +1,6 @@
 # distributed_lab3
 A simple tcp chat server in python.
+Give the port number as an argument when running the server.
 
 <h6>To join a room:</h6>
 
