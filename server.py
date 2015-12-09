@@ -4,10 +4,12 @@ import sys
 from threading import Thread
 from Queue import Queue
 import os
+from urllib2 import urlopen
+
 
 HOST = ''  # host becomes any address the machine happens to have
 PORT = int(sys.argv[1])  # get the port from the command line arguments and convert to int
-IP = "78.62.8.142"
+IP = urlopen('http://ip.42.pl/raw').read()
 STUDENT_ID = '39e95f0efebef82542626bd6c3c28765726768817d45d38b2d911b26eb5d0b37'
 POOL_SIZE = 20
 
@@ -27,6 +29,8 @@ class Worker(Thread):
         while True:
             conn = self.tasks.get()  # take a connection from the queue
             self.messageParser(conn)
+            self.tasks.task_done()
+
 
 
 class ThreadPool:
@@ -43,11 +47,11 @@ class ThreadPool:
         self.tasks.put((conn))
 
 
+
 class ChatServer:
     """a chat server with several chat rooms"""
 
     def __init__(self, port, num_thread):
-
         self.users_in_rooms = {}  # stores all roomid and the clients in those rooms {[RoomId : {[clientId:conn],{[clientId1:conn]}],.....]}
         self.rooms = {}  # stores all rooms and their ids in the form {[room_id:room_name], ... }
         self.users = {}  # keeps a list of all users who have used the chatserver in form [name:id]
@@ -62,7 +66,7 @@ class ChatServer:
         self.pool = ThreadPool(num_thread, self)
 
     def listen(self):
-
+        """loops for ever and puts new connections on the queue"""
         self.socket.listen(5)
         print 'listening now'
         # keep the server alive
@@ -73,10 +77,8 @@ class ChatServer:
 
     def messageParser(self, conn):
         """reads a message from the connection and calls the appropriate function based on that message"""
-
         while conn:
             data = conn.recv(2048)
-            print data
             if data == "KILL_SERVICE\n":
                 os._exit(0)
             elif data.startswith("HELO") and data.endswith("\n"):
@@ -89,15 +91,11 @@ class ChatServer:
                 self.chat(data, conn)
             elif data.startswith("DISCONNECT") and data.endswith("\n"):
                 self.disconnectUser(data, conn)
-            else:
-                conn.sendall('\n')  # any other message
-
-        self.tasks.task_done()
 
     def chat(self,data,conn):
+        """sends a message from a user to all other users in a given chatroom using sendMessageToRoom"""
         text = data.splitlines()
         room_id = int(text[0].split(":")[1])
-        client_id = int(text[1].split(":")[1])
         client_name = text[2].split(":")[1]
         message_from_client = text[3].split(":")[1]
         message_to_send = "CHAT: {0}\nCLIENT_NAME: {1}\nMESSAGE: {2}\n\n".format(str(room_id),client_name,message_from_client)
@@ -105,28 +103,28 @@ class ChatServer:
 
 
     def disconnectUser(self,data,conn):
-
+        """sends a leave message to every room the given client is in and then terminates their connection"""
         text = data.splitlines()
         client_name = text[2].split(":")[1]
         if client_name in self.users:
             client_id = self.users[client_name]
-            del self.users[client_name]
-            conn.close()
-            conn = None
-            for room in self.users_in_rooms:
+            room_keys = sorted(self.users_in_rooms.keys())
+            for room in room_keys:
                 if client_id in self.users_in_rooms[room]:
-                    room_leave_message = "CHAT: {0}\nCLIENT_NAME: {1}\nMESSAGE:{1} has left this chatroom.\n\n".format(str(room),client_name)
-                    self.sendMessageToRoom(room_leave_message,room)
-                    del self.users_in_rooms[room][client_id]
-
+                    room_leave_message = "LEAVE_CHATROOM: {0}\nJOIN_ID: {1} \nCLIENT_NAME: {2}\n\n".format(str(room),str(client_id),client_name)
+                    print room_leave_message
+                    self.leaveRoom(room_leave_message)
+        conn = None
 
 
     def leaveRoom(self,data, conn=None):
+        """sends a message to every user in the given room that the client has left and sends the client a confirmation message,unless
+            they are disconnecting"""
         text = data.splitlines()
         room_id = int(text[0].split(":")[1])
         client_id = int(text[1].split(":")[1])
         client_name = text[2].split(":")[1]
-        if conn:
+        if conn: #when disconnecting this message is not sent
             conn.sendall("LEFT_CHATROOM: {0}\nJOIN_ID: {1}\n".format(str(room_id),str(client_id)))
         if client_id in self.users_in_rooms[room_id]:
             room_leave_message = "CHAT: {0}\nCLIENT_NAME: {1}\nMESSAGE:{1} has left this chatroom.\n\n".format(str(room_id),client_name)
@@ -136,7 +134,6 @@ class ChatServer:
     def joinRoom(self, data, conn):
         """adds a user to a room and sends a message to everyone in that room to notify them
             if the room does not exist then it is created"""
-
         text = data.splitlines()
         room_name = text[0].split(":")[1]
         client_name = text[3].split(":")[1]
@@ -161,7 +158,6 @@ class ChatServer:
     def sendMessageToRoom(self, message, room_id):
         """sends a given message to all clients in a given chatroom"""
         for users in self.users_in_rooms[room_id]:
-            print message
             self.users_in_rooms[room_id][users].sendall(message)
 
 
