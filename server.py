@@ -112,7 +112,6 @@ class ChatServer:
             for room in room_keys:
                 if client_id in self.users_in_rooms[room]:
                     room_leave_message = "LEAVE_CHATROOM: {0}\nJOIN_ID: {1} \nCLIENT_NAME: {2}\n\n".format(str(room),str(client_id),client_name)
-                    print room_leave_message
                     self.leaveRoom(room_leave_message)
         conn = None
 
